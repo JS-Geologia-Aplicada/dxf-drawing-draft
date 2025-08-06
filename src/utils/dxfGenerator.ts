@@ -216,6 +216,8 @@ export const generateDXF = async (data: PalitoData[]) => {
       );
     }
 
+    // Organizando textos maiores que as camadas
+
     // Linhas de profundidade
     sondagem.depths.forEach((d) => {
       if (d === 0) return;
@@ -255,7 +257,7 @@ export const generateDXF = async (data: PalitoData[]) => {
       const adjustedY = currentOrigin.y - midDepth + totalTextHeight / 2;
 
       const descriptionStr =
-        sondagem.interp && sondagem.interp[index].trim()
+        sondagem.interp && sondagem.interp[index]
           ? sondagem.interp[index].trim().toUpperCase() +
             " - " +
             description.trim().toUpperCase()
@@ -353,4 +355,35 @@ const downloadDXF = (content: string, filename: string) => {
   link.click();
 
   URL.revokeObjectURL(url);
+};
+
+const getDescriptionOffsets = (sondagem: PalitoData) => {
+  const geolLayerData = sondagem.geology.map((entry, index) => {
+    const str =
+      sondagem.interp && sondagem.interp[index].trim()
+        ? sondagem.interp[index].trim().toUpperCase() +
+          " - " +
+          entry.trim().toUpperCase()
+        : entry.trim().toUpperCase();
+    const lines = Math.ceil(str.length / 35);
+    const estimatedHeight = lines * 0.45 - 0.1;
+    const from = sondagem.depths[index] | 0;
+    const to =
+      sondagem.depths[index + 1] | sondagem.depths[sondagem.depths.length];
+    const layerThickness = to - from;
+
+    return {
+      str: str,
+      lines: lines,
+      estimatedHeight: estimatedHeight,
+      from: from,
+      to: to,
+      layerThickness: layerThickness,
+    };
+  });
+
+  const layerThicknessArr = geolLayerData.map((entry) => entry.layerThickness);
+  const textHeightsArr = geolLayerData.map((entry) => entry.estimatedHeight);
+
+  for (let i = 0; i < layerThicknessArr.length; i++) {}
 };
