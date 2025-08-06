@@ -76,7 +76,7 @@ function App() {
       await generateDXF(palitoData);
       setMessage({ type: "success", text: "DXF gerado com sucesso!" });
     } catch (error) {
-      setMessage({ type: "error", text: "Erro ao gerar DXF" });
+      setMessage({ type: "error", text: "Erro ao gerar DXF!" });
       console.error("Erro:", error);
     } finally {
       setIsLoading(false);
