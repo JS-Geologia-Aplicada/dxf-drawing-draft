@@ -306,7 +306,7 @@ export const generateDXF = async (data: PalitoData[]) => {
       point3d(currentOrigin.x + 2.9136, currentOrigin.y - waterLevel)
     );
     const textPoint = point3d(
-      sondagem.water_level ? currentOrigin.x + 2.86 : 2.76,
+      sondagem.water_level ? currentOrigin.x + 2.86 : currentOrigin.x + 2.76,
       currentOrigin.y - waterLevel + 0.48
     );
     const waterLevelText = dxf.addText(textPoint, 0.25, waterLevelStr, {
@@ -318,7 +318,8 @@ export const generateDXF = async (data: PalitoData[]) => {
     waterLevelText.textStyle = arialTextStyle.name;
 
     // Profundidade final
-    const finalDepthStr = "PROFUNDIDADE FINAL = " + maxDepth.toFixed(2) + " m.";
+    const finalDepthStr =
+      "PROFUNDIDADE FINAL = " + maxDepth.toFixed(2).replace(".", ",") + " m.";
     const finalDepthPosition = point3d(
       currentOrigin.x - 5.72,
       currentOrigin.y - maxDepth - 0.87
