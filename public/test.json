@@ -1,0 +1,108 @@
+[
+  {
+    "hole_id": "11A-002",
+    "nspt": {
+      "start_depth": 1,
+      "interval": 1,
+      "values": [
+        "5",
+        "4",
+        "6",
+        "6",
+        "7",
+        "9",
+        "8",
+        "7",
+        "6",
+        "9",
+        "9",
+        "12",
+        "15",
+        "19",
+        "22"
+      ]
+    },
+    "depths": [0, 2.7, 6.9, 9.8, 13.5, 15.45],
+    "geology": [
+      "Pedregulho vermelho de consistência mole",
+      "Argila vermelha, branca e amarelo de consistência média",
+      "Argila siltosa vermelha, branca e amarela de consistência média",
+      "Silte arenoso vermelho, branco e amarelo de consistência pouco compacta a medianamente compacta",
+      "Silte arenoso vermelho e branco de consistência medianamente compacta a compacta"
+    ],
+    "max_depth": 15.45,
+    "z": 302.55
+  },
+  {
+    "hole_id": "SP-11A-003",
+    "nspt": {
+      "start_depth": 1,
+      "interval": 1,
+      "values": [
+        "16",
+        "11",
+        "8",
+        "2",
+        "2",
+        "2",
+        "2",
+        "2",
+        "2",
+        "2",
+        "2",
+        "6",
+        "11",
+        "20",
+        "28"
+      ]
+    },
+    "depths": [0, 3.8, 4.7, 5.8, 8.7, 10.6, 13.45, 15.45],
+    "geology": [
+      "Aterro de argila c/ pedregulho amarelo e vermelho de consistência média à rija",
+      "Argila arenosa c/ pedregulho amarela, vermelha e cinza de consistência muito mole",
+      "Argila silto-arenosa orgânica escura de consistência muito mole",
+      "Argila arenosa c/ pedregulho vermelha e cinza de consistência muito mole",
+      "Areia siltosa cinza de consistência fofa",
+      "Areia siltosa branca de compacidade fofa/ Amostra não recuperada do amostrador",
+      "Areia siltosa branca de compacidade compacta / Amostra não recuperada do amostrador"
+    ],
+    "max_depth": 15.45,
+    "z": 263.55,
+    "water_level": 4.93
+  },
+  {
+    "hole_id": "11A-005",
+    "nspt": {
+      "start_depth": 1,
+      "interval": 1,
+      "values": [
+        "2",
+        "4",
+        "3",
+        "4",
+        "4",
+        "5",
+        "9",
+        "12",
+        "10",
+        "7",
+        "7",
+        "11",
+        "12",
+        "18",
+        "22"
+      ]
+    },
+    "depths": [0, 0.3, 1.8, 3.6, 6.9, 12.7, 15.45],
+    "geology": [
+      "Cascalho com argila vermelha",
+      "Argila vermelha de consistência muito mole",
+      "Argila pouco arenosa vermelha de consistência muito mole a mole",
+      "Argila siltosa pouco arenosa vermelha de consistência mole",
+      "Silte arenoso vermelho e branco de consistencia pouco compacta a medianamente compacta",
+      "Silte arenoso vermelho de consistência medianamente compacta a compacta"
+    ],
+    "max_depth": 15.45,
+    "z": 295.55
+  }
+]

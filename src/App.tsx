@@ -24,7 +24,7 @@ function App() {
   const loadTestData = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch("/sp10.json");
+      const response = await fetch("/test.json");
       const data = await response.json();
       setPalitoData(data);
       setMessage({
