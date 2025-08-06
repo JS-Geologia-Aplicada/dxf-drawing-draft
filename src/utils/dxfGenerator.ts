@@ -357,33 +357,33 @@ const downloadDXF = (content: string, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
-const getDescriptionOffsets = (sondagem: PalitoData) => {
-  const geolLayerData = sondagem.geology.map((entry, index) => {
-    const str =
-      sondagem.interp && sondagem.interp[index].trim()
-        ? sondagem.interp[index].trim().toUpperCase() +
-          " - " +
-          entry.trim().toUpperCase()
-        : entry.trim().toUpperCase();
-    const lines = Math.ceil(str.length / 35);
-    const estimatedHeight = lines * 0.45 - 0.1;
-    const from = sondagem.depths[index] | 0;
-    const to =
-      sondagem.depths[index + 1] | sondagem.depths[sondagem.depths.length];
-    const layerThickness = to - from;
+// const getDescriptionOffsets = (sondagem: PalitoData) => {
+//   const geolLayerData = sondagem.geology.map((entry, index) => {
+//     const str =
+//       sondagem.interp && sondagem.interp[index].trim()
+//         ? sondagem.interp[index].trim().toUpperCase() +
+//           " - " +
+//           entry.trim().toUpperCase()
+//         : entry.trim().toUpperCase();
+//     const lines = Math.ceil(str.length / 35);
+//     const estimatedHeight = lines * 0.45 - 0.1;
+//     const from = sondagem.depths[index] | 0;
+//     const to =
+//       sondagem.depths[index + 1] | sondagem.depths[sondagem.depths.length];
+//     const layerThickness = to - from;
 
-    return {
-      str: str,
-      lines: lines,
-      estimatedHeight: estimatedHeight,
-      from: from,
-      to: to,
-      layerThickness: layerThickness,
-    };
-  });
+//     return {
+//       str: str,
+//       lines: lines,
+//       estimatedHeight: estimatedHeight,
+//       from: from,
+//       to: to,
+//       layerThickness: layerThickness,
+//     };
+//   });
 
-  const layerThicknessArr = geolLayerData.map((entry) => entry.layerThickness);
-  const textHeightsArr = geolLayerData.map((entry) => entry.estimatedHeight);
+//   const layerThicknessArr = geolLayerData.map((entry) => entry.layerThickness);
+//   const textHeightsArr = geolLayerData.map((entry) => entry.estimatedHeight);
 
-  for (let i = 0; i < layerThicknessArr.length; i++) {}
-};
+//   for (let i = 0; i < layerThicknessArr.length; i++) {}
+// };
