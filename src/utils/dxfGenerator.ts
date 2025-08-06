@@ -179,7 +179,7 @@ export const generateDXF = async (data: PalitoData[]) => {
       { colorNumber: Colors.Red }
     );
 
-    for (let i = 0; i < maxDepth - 2; i += 2) {
+    for (let i = 0; i < maxDepth - 1; i += 2) {
       dxf.addInsert(
         scaleBlock.name,
         point3d(currentOrigin.x, currentOrigin.y - i),
@@ -209,12 +209,12 @@ export const generateDXF = async (data: PalitoData[]) => {
       dxf.addHatch(finalScaleBoundary, solidPattern, {
         colorNumber: Colors.Red,
       });
-      dxf.addLine(
-        point3d(currentOrigin.x, currentOrigin.y - maxDepth),
-        point3d(currentOrigin.x + 0.2, currentOrigin.y - maxDepth),
-        { colorNumber: Colors.Red }
-      );
     }
+    dxf.addLine(
+      point3d(currentOrigin.x, currentOrigin.y - maxDepth),
+      point3d(currentOrigin.x + 0.2, currentOrigin.y - maxDepth),
+      { colorNumber: Colors.Red }
+    );
 
     // Organizando textos maiores que as camadas
 
@@ -357,33 +357,73 @@ const downloadDXF = (content: string, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
-// const getDescriptionOffsets = (sondagem: PalitoData) => {
-//   const geolLayerData = sondagem.geology.map((entry, index) => {
-//     const str =
-//       sondagem.interp && sondagem.interp[index].trim()
-//         ? sondagem.interp[index].trim().toUpperCase() +
-//           " - " +
-//           entry.trim().toUpperCase()
-//         : entry.trim().toUpperCase();
-//     const lines = Math.ceil(str.length / 35);
-//     const estimatedHeight = lines * 0.45 - 0.1;
-//     const from = sondagem.depths[index] | 0;
-//     const to =
-//       sondagem.depths[index + 1] | sondagem.depths[sondagem.depths.length];
-//     const layerThickness = to - from;
+export const getDescriptionOffsets = (sondagem: PalitoData) => {
+  const geolLayerData = sondagem.geology.map((entry, index) => {
+    const str =
+      sondagem.interp && sondagem.interp[index].trim()
+        ? sondagem.interp[index].trim().toUpperCase() +
+          " - " +
+          entry.trim().toUpperCase()
+        : entry.trim().toUpperCase();
+    const lines = Math.ceil(str.length / 35);
+    const estimatedHeight = lines * 0.45 - 0.1;
+    const from = sondagem.depths[index] | 0;
+    const to =
+      sondagem.depths[index + 1] | sondagem.depths[sondagem.depths.length];
+    const layerThickness = to - from;
 
-//     return {
-//       str: str,
-//       lines: lines,
-//       estimatedHeight: estimatedHeight,
-//       from: from,
-//       to: to,
-//       layerThickness: layerThickness,
-//     };
-//   });
+    return {
+      str: str,
+      lines: lines,
+      estimatedHeight: estimatedHeight,
+      from: from,
+      to: to,
+      layerThickness: layerThickness,
+    };
+  });
 
-//   const layerThicknessArr = geolLayerData.map((entry) => entry.layerThickness);
-//   const textHeightsArr = geolLayerData.map((entry) => entry.estimatedHeight);
+  const layerThicknessArr = geolLayerData.map((entry) => entry.layerThickness);
+  const textHeightsArr = geolLayerData.map((entry) => entry.estimatedHeight);
 
-//   for (let i = 0; i < layerThicknessArr.length; i++) {}
-// };
+  let conflictAnalysis = [];
+  for (let i = 0; i < layerThicknessArr.length; i++) {
+    const hasOverflow = textHeightsArr[i] > layerThicknessArr[i];
+    const overflow = hasOverflow ? textHeightsArr[i] - layerThicknessArr[i] : 0;
+
+    conflictAnalysis.push({
+      index: i,
+      hasOverflow,
+      overflow,
+      availableSpace: layerThicknessArr[i] - textHeightsArr[i], // pode ser negativo
+    });
+  }
+
+  // let adjustedLayerHeights = [];
+  // let removedHeight = 0;
+
+  // for (let i = 0; i < layerThicknessArr.length; i++) {
+  //   if (textHeightsArr[i] + removedHeight > layerThicknessArr[i]) {
+  //     const overflowDirection =
+  //       i === 0
+  //         ? "below"
+  //         : i === layerThicknessArr.length
+  //         ? "above"
+  //         : layerThicknessArr[i - 1] > layerThicknessArr[i + 1]
+  //         ? "above"
+  //         : "below";
+  //     const adjustedHeight = textHeightsArr[i] + 0.2;
+
+  //     if (overflowDirection === "above") {
+  //       adjustedLayerHeights[i - 1] - adjustedHeight;
+  //       adjustedLayerHeights.push(adjustedHeight);
+  //     } else {
+  //       removedHeight += adjustedHeight - layerThicknessArr[i];
+  //       adjustedLayerHeights.push(adjustedHeight);
+  //     }
+  //     // Preciso de alguma forma inserir um loop para ir "comendo" camadas até a soma de todas as alturas de textos ser menor que a soma de todas as alturas de camadas
+  //   } else {
+  //     adjustedLayerHeights.push(layerThicknessArr[i] - removedHeight);
+  //     removedHeight = 0;
+  //   }
+  // }
+};
