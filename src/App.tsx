@@ -16,7 +16,7 @@ function App() {
   const [palitoData, setPalitoData] = useState<PalitoData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{
-    type: "success" | "error";
+    type: "success" | "error" | "warning";
     text: string;
   } | null>(null);
 
@@ -73,8 +73,19 @@ function App() {
 
     try {
       setIsLoading(true);
-      await generateDXF(palitoData);
-      setMessage({ type: "success", text: "DXF gerado com sucesso!" });
+      const result = await generateDXF(palitoData);
+      if (result.processErrorNames.length > 0) {
+        setMessage({
+          type: "warning",
+          text: `DXF gerado! ${result.successCount}/${
+            result.totalProcessed
+          } palitos processados. Falhas: ${result.processErrorNames.join(
+            ", "
+          )}`,
+        });
+      } else {
+        setMessage({ type: "success", text: "DXF gerado com sucesso!" });
+      }
     } catch (error) {
       setMessage({ type: "error", text: "Erro ao gerar DXF!" });
       console.error("Erro:", error);
@@ -95,7 +106,13 @@ function App() {
               {/* Mensagens */}
               {message && (
                 <Alert
-                  variant={message.type === "success" ? "success" : "danger"}
+                  variant={
+                    message.type === "success"
+                      ? "success"
+                      : message.type === "warning"
+                      ? "warning"
+                      : "danger"
+                  }
                   onClose={() => setMessage(null)}
                   dismissible
                 >

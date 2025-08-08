@@ -116,225 +116,243 @@ export const generateDXF = async (data: PalitoData[]) => {
   waterLevelBlock.addHatch(waterLevelBoundary, solidPattern);
   waterLevelBlock.addLine(point3d(-0.2754, 0.4406), point3d(1.574, 0.4406));
 
+  const processErrorNames: string[] = [];
   // Construindo cada palito
   data.forEach((sondagem, index) => {
-    // Parâmetros individuais do palito
-    const currentOrigin = point3d(firstOrigin.x + gap * index, firstOrigin.y);
-    const maxDepth =
-      sondagem.max_depth || sondagem.depths[sondagem.depths.length];
+    try {
+      // Parâmetros individuais do palito
+      const currentOrigin = point3d(firstOrigin.x + gap * index, firstOrigin.y);
+      const maxDepth =
+        sondagem.max_depth || sondagem.depths[sondagem.depths.length];
 
-    // Fazendo o cabeçalho
-    dxf.addLine(
-      point3d(currentOrigin.x + 0.1, currentOrigin.y),
-      point3d(currentOrigin.x + 0.1, currentOrigin.y + 2.45),
-      { layerName: titlesLayer.name }
-    );
-    dxf.addLine(
-      point3d(currentOrigin.x + 0.1, currentOrigin.y + 2.45),
-      point3d(currentOrigin.x - 4.95, currentOrigin.y + 2.45),
-
-      { layerName: titlesLayer.name }
-    );
-
-    const title = dxf.addText(
-      point3d(currentOrigin.x - 0.18, currentOrigin.y + 2.67),
-      0.65,
-      sondagem.hole_id.toUpperCase(),
-      {
-        layerName: titlesLayer.name,
-        horizontalAlignment: TextHorizontalAlignment.Right,
-        verticalAlignment: TextVerticalAlignment.Bottom,
-        secondAlignmentPoint: point3d(
-          currentOrigin.x - 0.18,
-          currentOrigin.y + 2.67
-        ),
-      }
-    );
-    title.textStyle = "arialText";
-
-    const cota = dxf.addText(
-      point3d(currentOrigin.x - 0.18, currentOrigin.y + 1.6),
-      0.45,
-      sondagem.z ? "COTA=" + sondagem.z.toFixed(2).replace(".", ",") : "COTA=0",
-      {
-        layerName: titlesLayer.name,
-        horizontalAlignment: TextHorizontalAlignment.Right,
-        verticalAlignment: TextVerticalAlignment.Bottom,
-        secondAlignmentPoint: point3d(
-          currentOrigin.x - 0.18,
-          currentOrigin.y + 1.6
-        ),
-      }
-    );
-    cota.textStyle = "arialText";
-
-    // Fazendo a escala vertical
-    dxf.addLine(
-      currentOrigin,
-      point3d(currentOrigin.x, currentOrigin.y - maxDepth),
-      {
-        colorNumber: Colors.Red,
-      }
-    );
-    dxf.addLine(
-      point3d(currentOrigin.x + 0.2, currentOrigin.y),
-      point3d(currentOrigin.x + 0.2, currentOrigin.y - maxDepth),
-      { colorNumber: Colors.Red }
-    );
-
-    for (let i = 0; i < maxDepth - 1; i += 2) {
-      dxf.addInsert(
-        scaleBlock.name,
-        point3d(currentOrigin.x, currentOrigin.y - i),
-        { colorNumber: Colors.Red }
+      // Fazendo o cabeçalho
+      dxf.addLine(
+        point3d(currentOrigin.x + 0.1, currentOrigin.y),
+        point3d(currentOrigin.x + 0.1, currentOrigin.y + 2.45),
+        { layerName: titlesLayer.name }
       );
-    }
-    const depthFloor = Math.floor(maxDepth);
-    if (depthFloor !== maxDepth && !(depthFloor % 2)) {
-      const finalScalePolyline = new HatchPolylineBoundary();
-      finalScalePolyline.add(
-        vertex(currentOrigin.x, currentOrigin.y - depthFloor)
-      );
-      finalScalePolyline.add(
-        vertex(currentOrigin.x + 0.2, currentOrigin.y - depthFloor)
-      );
-      finalScalePolyline.add(
-        vertex(currentOrigin.x + 0.2, currentOrigin.y - maxDepth)
-      );
-      finalScalePolyline.add(
-        vertex(currentOrigin.x, currentOrigin.y - maxDepth)
-      );
-      finalScalePolyline.add(
-        vertex(currentOrigin.x, currentOrigin.y - depthFloor)
-      );
-      const finalScaleBoundary = new HatchBoundaryPaths();
-      finalScaleBoundary.addPolylineBoundary(finalScalePolyline);
-      dxf.addHatch(finalScaleBoundary, solidPattern, {
-        colorNumber: Colors.Red,
-      });
-    }
-    dxf.addLine(
-      point3d(currentOrigin.x, currentOrigin.y - maxDepth),
-      point3d(currentOrigin.x + 0.2, currentOrigin.y - maxDepth),
-      { colorNumber: Colors.Red }
-    );
+      dxf.addLine(
+        point3d(currentOrigin.x + 0.1, currentOrigin.y + 2.45),
+        point3d(currentOrigin.x - 4.95, currentOrigin.y + 2.45),
 
-    // Organizando textos maiores que as camadas
-    const clusters = getDescriptionClusters(sondagem);
-    let currentY = 0;
-    clusters.forEach((cluster) => {
-      let cumulativeDepth = cluster.layerSizes[0].from || 0;
-      currentY = cluster.layerSizes[0].from;
+        { layerName: titlesLayer.name }
+      );
 
-      // Gerar texto da descrição
-      cluster.layers.forEach((layerIndex, index) => {
-        const layerSize = cluster.layerSizes.find(
-          (ls) => ls.layerIndex === layerIndex
-        );
-        if (!layerSize) return;
-
-        const layerCenterY = currentY + layerSize.finalHeight / 2;
-
-        // Aqui layer é o índice da camada no contexto geral, e index é o índice no array cluster.layers
-        const descriptionStr =
-          sondagem.interp && sondagem.interp[layerIndex]
-            ? sondagem.interp[layerIndex].trim().toUpperCase() +
-              " - " +
-              sondagem.geology[layerIndex].trim().toUpperCase()
-            : sondagem.geology[layerIndex].trim().toUpperCase();
-        // Checar se precisa de degrau na linha de profundidade
-        const originalDepth = layerSize.to;
-        const correctedDepth = cluster.unchanged
-          ? undefined
-          : (cumulativeDepth += layerSize.finalHeight);
-        // Chama função de desenhar dados da camada
-        drawLayerData(
-          dxf,
-          cluster.layerSizes[index],
-          currentOrigin,
-          originalDepth,
-          descriptionStr,
-          descriptionMTextOptions,
-          depthLinesLayer,
-          arialTextStyle,
-          layerCenterY,
-          correctedDepth
-        );
-        currentY += layerSize.finalHeight;
-      });
-    });
-
-    //NSPTs
-    const firstNsptDepth = sondagem.nspt.start_depth;
-    let currentNsptDepth = firstNsptDepth;
-    sondagem.nspt.values.forEach((value) => {
-      const nsptText = dxf.addText(
-        point3d(
-          currentOrigin.x + 0.57,
-          currentOrigin.y - currentNsptDepth - 0.12
-        ),
-        0.35,
-        value,
+      const title = dxf.addText(
+        point3d(currentOrigin.x - 0.18, currentOrigin.y + 2.67),
+        0.65,
+        sondagem.hole_id.toUpperCase(),
         {
-          layerName: depthLinesLayer.name,
-          horizontalAlignment: TextHorizontalAlignment.Left,
-          verticalAlignment: TextVerticalAlignment.Top,
+          layerName: titlesLayer.name,
+          horizontalAlignment: TextHorizontalAlignment.Right,
+          verticalAlignment: TextVerticalAlignment.Bottom,
           secondAlignmentPoint: point3d(
-            currentOrigin.x + 0.57,
-            currentOrigin.y - currentNsptDepth - 0.12
+            currentOrigin.x - 0.18,
+            currentOrigin.y + 2.67
           ),
         }
       );
-      nsptText.textStyle = arialTextStyle.name;
-      currentNsptDepth += 1;
-    });
+      title.textStyle = "arialText";
 
-    // Nível d'água
-    const waterLevel = sondagem.water_level ?? maxDepth;
-    const waterLevelStr =
-      sondagem.water_level != null
-        ? "NA=" + sondagem.water_level.toFixed(2).replace(".", ",")
-        : "NA SECO";
-    dxf.addInsert(
-      waterLevelBlock.name,
-      point3d(currentOrigin.x + 2.9136, currentOrigin.y - waterLevel)
-    );
-    const textPoint = point3d(
-      sondagem.water_level ? currentOrigin.x + 2.86 : currentOrigin.x + 2.76,
-      currentOrigin.y - waterLevel + 0.48
-    );
-    const waterLevelText = dxf.addText(textPoint, 0.25, waterLevelStr, {
-      layerName: waterLevelTextLayer.name,
-      horizontalAlignment: TextHorizontalAlignment.Left,
-      verticalAlignment: TextVerticalAlignment.Bottom,
-      secondAlignmentPoint: textPoint,
-    });
-    waterLevelText.textStyle = arialTextStyle.name;
+      const cota = dxf.addText(
+        point3d(currentOrigin.x - 0.18, currentOrigin.y + 1.6),
+        0.45,
+        sondagem.z
+          ? "COTA=" + sondagem.z.toFixed(2).replace(".", ",")
+          : "COTA=0",
+        {
+          layerName: titlesLayer.name,
+          horizontalAlignment: TextHorizontalAlignment.Right,
+          verticalAlignment: TextVerticalAlignment.Bottom,
+          secondAlignmentPoint: point3d(
+            currentOrigin.x - 0.18,
+            currentOrigin.y + 1.6
+          ),
+        }
+      );
+      cota.textStyle = "arialText";
 
-    // Profundidade final
-    const finalDepthStr =
-      "PROFUNDIDADE FINAL = " + maxDepth.toFixed(2).replace(".", ",") + " m.";
-    const finalDepthPosition = point3d(
-      currentOrigin.x - 5.72,
-      currentOrigin.y - 0.87 - currentY
-    );
-    const finalDepthText = dxf.addText(
-      finalDepthPosition,
-      0.35,
-      finalDepthStr,
-      {
-        horizontalAlignment: TextHorizontalAlignment.Left,
-        verticalAlignment: TextVerticalAlignment.Top,
-        secondAlignmentPoint: finalDepthPosition,
-        layerName: finalDepthLayer.name,
+      // Fazendo a escala vertical
+      dxf.addLine(
+        currentOrigin,
+        point3d(currentOrigin.x, currentOrigin.y - maxDepth),
+        {
+          colorNumber: Colors.Red,
+        }
+      );
+      dxf.addLine(
+        point3d(currentOrigin.x + 0.2, currentOrigin.y),
+        point3d(currentOrigin.x + 0.2, currentOrigin.y - maxDepth),
+        { colorNumber: Colors.Red }
+      );
+
+      for (let i = 0; i < maxDepth - 1; i += 2) {
+        dxf.addInsert(
+          scaleBlock.name,
+          point3d(currentOrigin.x, currentOrigin.y - i),
+          { colorNumber: Colors.Red }
+        );
       }
-    );
-    finalDepthText.textStyle = arialTextStyle.name;
+      const depthFloor = Math.floor(maxDepth);
+      if (depthFloor !== maxDepth && !(depthFloor % 2)) {
+        const finalScalePolyline = new HatchPolylineBoundary();
+        finalScalePolyline.add(
+          vertex(currentOrigin.x, currentOrigin.y - depthFloor)
+        );
+        finalScalePolyline.add(
+          vertex(currentOrigin.x + 0.2, currentOrigin.y - depthFloor)
+        );
+        finalScalePolyline.add(
+          vertex(currentOrigin.x + 0.2, currentOrigin.y - maxDepth)
+        );
+        finalScalePolyline.add(
+          vertex(currentOrigin.x, currentOrigin.y - maxDepth)
+        );
+        finalScalePolyline.add(
+          vertex(currentOrigin.x, currentOrigin.y - depthFloor)
+        );
+        const finalScaleBoundary = new HatchBoundaryPaths();
+        finalScaleBoundary.addPolylineBoundary(finalScalePolyline);
+        dxf.addHatch(finalScaleBoundary, solidPattern, {
+          colorNumber: Colors.Red,
+        });
+      }
+      dxf.addLine(
+        point3d(currentOrigin.x, currentOrigin.y - maxDepth),
+        point3d(currentOrigin.x + 0.2, currentOrigin.y - maxDepth),
+        { colorNumber: Colors.Red }
+      );
+
+      // Organizando textos maiores que as camadas
+      const clusters = getDescriptionClusters(sondagem);
+      let currentY = 0;
+      clusters.forEach((cluster) => {
+        let cumulativeDepth = cluster.layerSizes[0].from || 0;
+        currentY = cluster.layerSizes[0].from;
+
+        // Gerar texto da descrição
+        cluster.layers.forEach((layerIndex, index) => {
+          const layerSize = cluster.layerSizes.find(
+            (ls) => ls.layerIndex === layerIndex
+          );
+          if (!layerSize) return;
+
+          const layerCenterY = currentY + layerSize.finalHeight / 2;
+
+          // Aqui layer é o índice da camada no contexto geral, e index é o índice no array cluster.layers
+          const descriptionStr =
+            sondagem.interp && sondagem.interp[layerIndex]
+              ? sondagem.interp[layerIndex].trim().toUpperCase() +
+                " - " +
+                sondagem.geology[layerIndex].trim().toUpperCase()
+              : sondagem.geology[layerIndex].trim().toUpperCase();
+          // Checar se precisa de degrau na linha de profundidade
+          const originalDepth = layerSize.to;
+          const correctedDepth = cluster.unchanged
+            ? undefined
+            : (cumulativeDepth += layerSize.finalHeight);
+          // Chama função de desenhar dados da camada
+          drawLayerData(
+            dxf,
+            cluster.layerSizes[index],
+            currentOrigin,
+            originalDepth,
+            descriptionStr,
+            descriptionMTextOptions,
+            depthLinesLayer,
+            arialTextStyle,
+            layerCenterY,
+            correctedDepth
+          );
+          currentY += layerSize.finalHeight;
+        });
+      });
+
+      //NSPTs
+      const firstNsptDepth = sondagem.nspt.start_depth;
+      let currentNsptDepth = firstNsptDepth;
+      sondagem.nspt.values.forEach((value) => {
+        const nsptText = dxf.addText(
+          point3d(
+            currentOrigin.x + 0.57,
+            currentOrigin.y - currentNsptDepth - 0.12
+          ),
+          0.35,
+          value,
+          {
+            layerName: depthLinesLayer.name,
+            horizontalAlignment: TextHorizontalAlignment.Left,
+            verticalAlignment: TextVerticalAlignment.Top,
+            secondAlignmentPoint: point3d(
+              currentOrigin.x + 0.57,
+              currentOrigin.y - currentNsptDepth - 0.12
+            ),
+          }
+        );
+        nsptText.textStyle = arialTextStyle.name;
+        currentNsptDepth += 1;
+      });
+
+      // Nível d'água
+      const waterLevel = sondagem.water_level ?? maxDepth;
+      const waterLevelStr =
+        sondagem.water_level != null
+          ? "NA=" + sondagem.water_level.toFixed(2).replace(".", ",")
+          : "NA SECO";
+      dxf.addInsert(
+        waterLevelBlock.name,
+        point3d(currentOrigin.x + 2.9136, currentOrigin.y - waterLevel)
+      );
+      const textPoint = point3d(
+        sondagem.water_level ? currentOrigin.x + 2.86 : currentOrigin.x + 2.76,
+        currentOrigin.y - waterLevel + 0.48
+      );
+      const waterLevelText = dxf.addText(textPoint, 0.25, waterLevelStr, {
+        layerName: waterLevelTextLayer.name,
+        horizontalAlignment: TextHorizontalAlignment.Left,
+        verticalAlignment: TextVerticalAlignment.Bottom,
+        secondAlignmentPoint: textPoint,
+      });
+      waterLevelText.textStyle = arialTextStyle.name;
+
+      // Profundidade final
+      const finalDepthStr =
+        "PROFUNDIDADE FINAL = " + maxDepth.toFixed(2).replace(".", ",") + " m.";
+      const finalDepthPosition = point3d(
+        currentOrigin.x - 5.72,
+        currentOrigin.y - 0.87 - currentY
+      );
+      const finalDepthText = dxf.addText(
+        finalDepthPosition,
+        0.35,
+        finalDepthStr,
+        {
+          horizontalAlignment: TextHorizontalAlignment.Left,
+          verticalAlignment: TextVerticalAlignment.Top,
+          secondAlignmentPoint: finalDepthPosition,
+          layerName: finalDepthLayer.name,
+        }
+      );
+      finalDepthText.textStyle = arialTextStyle.name;
+    } catch (error) {
+      console.error(
+        `❌ Erro no palito ${sondagem.hole_id} (índice ${index}):`,
+        error
+      );
+      processErrorNames.push(sondagem.hole_id);
+      return;
+    }
   });
 
   // Baixando o arquivo
   const dxfString = dxf.stringify();
   downloadDXF(dxfString, "palitos.dxf");
+  return {
+    success: true,
+    processErrorNames,
+    totalProcessed: data.length,
+    successCount: data.length - processErrorNames.length,
+  };
 };
 
 const downloadDXF = (content: string, filename: string) => {
