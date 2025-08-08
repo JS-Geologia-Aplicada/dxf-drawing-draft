@@ -239,13 +239,16 @@ export const generateDXF = async (data: PalitoData[]) => {
 
           const layerCenterY = currentY + layerSize.finalHeight / 2;
 
-          // Aqui layer é o índice da camada no contexto geral, e index é o índice no array cluster.layers
-          const descriptionStr =
-            sondagem.interp && sondagem.interp[layerIndex]
-              ? sondagem.interp[layerIndex].trim().toUpperCase() +
-                " - " +
-                sondagem.geology[layerIndex].trim().toUpperCase()
-              : sondagem.geology[layerIndex].trim().toUpperCase();
+          const interpText = sondagem.interp?.[layerIndex]?.trim();
+          const geologyText = sondagem.geology[layerIndex]?.trim();
+          if (!geologyText) {
+            console.warn(`Geology vazia no layer ${layerIndex}`);
+            return;
+          }
+          const descriptionStr = interpText
+            ? interpText.toUpperCase() + " - " + geologyText.toUpperCase()
+            : geologyText.toUpperCase();
+
           // Checar se precisa de degrau na linha de profundidade
           const originalDepth = layerSize.to;
           const correctedDepth = cluster.unchanged
@@ -336,7 +339,7 @@ export const generateDXF = async (data: PalitoData[]) => {
       finalDepthText.textStyle = arialTextStyle.name;
     } catch (error) {
       console.error(
-        `❌ Erro no palito ${sondagem.hole_id} (índice ${index}):`,
+        `Erro no palito ${sondagem.hole_id} (índice ${index}):`,
         error
       );
       processErrorNames.push(sondagem.hole_id);
@@ -368,29 +371,39 @@ const downloadDXF = (content: string, filename: string) => {
 };
 
 export const getDescriptionClusters = (sondagem: PalitoData): Cluster[] => {
-  const geolLayerData = sondagem.geology.map((entry, index) => {
-    const str =
-      sondagem.interp && sondagem.interp[index].trim()
-        ? sondagem.interp[index].trim().toUpperCase() +
-          " - " +
-          entry.trim().toUpperCase()
+  const geolLayerData = sondagem.geology
+    .filter((_entry, index) => index < sondagem.depths.length - 1)
+    .map((entry, index) => {
+      if (index >= sondagem.depths.length) {
+        return {
+          str: "",
+          lines: "",
+          estimatedHeight: 0,
+          from: 0,
+          to: 0,
+          layerThickness: 0,
+        };
+      }
+      const interpText = sondagem.interp?.[index]?.trim();
+      const str = interpText
+        ? interpText.toUpperCase() + " - " + entry.trim().toUpperCase()
         : entry.trim().toUpperCase();
-    const lines = Math.ceil(str.length / 35);
-    const estimatedHeight = lines * 0.45 - 0.1;
-    const from = sondagem.depths[index] || 0;
-    const to =
-      sondagem.depths[index + 1] || sondagem.depths[sondagem.depths.length];
-    const layerThickness = to - from;
+      const lines = Math.ceil(str.length / 35);
+      const estimatedHeight = lines * 0.45 - 0.1;
+      const from = sondagem.depths[index] || 0;
+      const to =
+        sondagem.depths[index + 1] || sondagem.depths[sondagem.depths.length];
+      const layerThickness = to - from;
 
-    return {
-      str: str,
-      lines: lines,
-      estimatedHeight: estimatedHeight,
-      from: from,
-      to: to,
-      layerThickness: layerThickness,
-    };
-  });
+      return {
+        str: str,
+        lines: lines,
+        estimatedHeight: estimatedHeight,
+        from: from,
+        to: to,
+        layerThickness: layerThickness,
+      };
+    });
 
   if (geolLayerData.length >= sondagem.depths.length) {
     geolLayerData.splice(sondagem.depths.length - 1);
@@ -444,7 +457,7 @@ export const getDescriptionClusters = (sondagem: PalitoData): Cluster[] => {
       const goBelow =
         cluster.startIndex === 0
           ? true
-          : cluster.endIndex === conflictAnalysis.length
+          : cluster.endIndex >= conflictAnalysis.length - 1
           ? false
           : conflictAnalysis[cluster.startIndex - 1].availableSpace <
             conflictAnalysis[cluster.endIndex + 1].availableSpace;
