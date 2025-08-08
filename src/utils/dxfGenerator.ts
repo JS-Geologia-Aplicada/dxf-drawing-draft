@@ -1,6 +1,8 @@
-import type { PalitoData } from "../types";
+import type { Cluster, LayerSize, PalitoData } from "../types";
 import {
   Colors,
+  DxfLayer,
+  DxfStyle,
   DxfWriter,
   HatchBoundaryPaths,
   HatchPolylineBoundary,
@@ -13,6 +15,7 @@ import {
   Units,
   vertex,
   type MTextOptions,
+  type vec3_t,
 } from "@tarikjabiri/dxf";
 
 export const generateDXF = async (data: PalitoData[]) => {
@@ -28,11 +31,6 @@ export const generateDXF = async (data: PalitoData[]) => {
   const dashedLine = dxf.tables.addLType("DASHED", "__ __ __", [0.25, -0.125]);
 
   // Layers
-  const depthLinesLayer = dxf.addLayer(
-    "depthsLineLayer",
-    Colors.Yellow,
-    dashedLine.name
-  );
   const scaleLayer = dxf.addLayer("scaleLayer", Colors.Red, "Continuous");
   const titlesLayer = dxf.addLayer("titlesLayer", Colors.Yellow, "Continuous");
   const finalDepthLayer = dxf.addLayer(
@@ -50,6 +48,11 @@ export const generateDXF = async (data: PalitoData[]) => {
     Colors.Yellow,
     "Continuous"
   );
+  const depthLinesLayer = dxf.addLayer(
+    "depthsLineLayer",
+    Colors.Yellow,
+    dashedLine.name
+  );
   const descriptionTextLayer = dxf.addLayer(
     "descriptionTextLayer",
     Colors.Yellow,
@@ -64,7 +67,7 @@ export const generateDXF = async (data: PalitoData[]) => {
 
   const descriptionMTextOptions: MTextOptions = {
     attachmentPoint: 3,
-    width: 7.5,
+    width: 8,
     layerName: descriptionTextLayer.name,
   };
 
@@ -217,59 +220,48 @@ export const generateDXF = async (data: PalitoData[]) => {
     );
 
     // Organizando textos maiores que as camadas
+    const clusters = getDescriptionClusters(sondagem);
+    let currentY = 0;
+    clusters.forEach((cluster) => {
+      let cumulativeDepth = cluster.layerSizes[0].from || 0;
+      currentY = cluster.layerSizes[0].from;
 
-    // Linhas de profundidade
-    sondagem.depths.forEach((d) => {
-      if (d === 0) return;
-      dxf.addInsert(
-        depthLineBlock.name,
-        point3d(currentOrigin.x, currentOrigin.y - d),
-        { layerName: depthLinesLayer.name }
-      );
+      // Gerar texto da descrição
+      cluster.layers.forEach((layerIndex, index) => {
+        const layerSize = cluster.layerSizes.find(
+          (ls) => ls.layerIndex === layerIndex
+        );
+        if (!layerSize) return;
 
-      const depthText = dxf.addText(
-        point3d(currentOrigin.x - 0.15, currentOrigin.y - d - 0.07),
-        0.35,
-        d.toFixed(2).replace(".", ","),
-        {
-          layerName: depthLinesLayer.name,
-          horizontalAlignment: TextHorizontalAlignment.Right,
-          verticalAlignment: TextVerticalAlignment.Bottom,
-          secondAlignmentPoint: point3d(
-            currentOrigin.x - 0.15,
-            currentOrigin.y - d - 0.07
-          ),
-        }
-      );
-      depthText.textStyle = arialTextStyle.name;
-    });
+        const layerCenterY = currentY + layerSize.finalHeight / 2;
 
-    // Descrições das camadas
-    sondagem.geology.forEach((description, index) => {
-      const startDepth = sondagem.depths[index] || 0;
-      const endDepth = sondagem.depths[index + 1] || maxDepth;
-      const midDepth = (startDepth + endDepth) / 2;
-
-      const estimatedLines = Math.ceil(description.length / 40); // ~40 chars por linha
-      const lineHeight = 0.35; // altura da linha + espaçamento
-      const totalTextHeight = estimatedLines * lineHeight;
-
-      const adjustedY = currentOrigin.y - midDepth + totalTextHeight / 2;
-
-      const descriptionStr =
-        sondagem.interp && sondagem.interp[index]
-          ? sondagem.interp[index].trim().toUpperCase() +
-            " - " +
-            description.trim().toUpperCase()
-          : description.trim().toUpperCase();
-
-      const descriptionText = dxf.addMText(
-        point3d(currentOrigin.x - 1.47, adjustedY),
-        0.25,
-        descriptionStr,
-        descriptionMTextOptions
-      );
-      descriptionText.textStyle = arialTextStyle.name;
+        // Aqui layer é o índice da camada no contexto geral, e index é o índice no array cluster.layers
+        const descriptionStr =
+          sondagem.interp && sondagem.interp[layerIndex]
+            ? sondagem.interp[layerIndex].trim().toUpperCase() +
+              " - " +
+              sondagem.geology[layerIndex].trim().toUpperCase()
+            : sondagem.geology[layerIndex].trim().toUpperCase();
+        // Checar se precisa de degrau na linha de profundidade
+        const originalDepth = layerSize.to;
+        const correctedDepth = cluster.unchanged
+          ? undefined
+          : (cumulativeDepth += layerSize.finalHeight);
+        // Chama função de desenhar dados da camada
+        drawLayerData(
+          dxf,
+          cluster.layerSizes[index],
+          currentOrigin,
+          originalDepth,
+          descriptionStr,
+          descriptionMTextOptions,
+          depthLinesLayer,
+          arialTextStyle,
+          layerCenterY,
+          correctedDepth
+        );
+        currentY += layerSize.finalHeight;
+      });
     });
 
     //NSPTs
@@ -324,7 +316,7 @@ export const generateDXF = async (data: PalitoData[]) => {
       "PROFUNDIDADE FINAL = " + maxDepth.toFixed(2).replace(".", ",") + " m.";
     const finalDepthPosition = point3d(
       currentOrigin.x - 5.72,
-      currentOrigin.y - maxDepth - 0.87
+      currentOrigin.y - 0.87 - currentY
     );
     const finalDepthText = dxf.addText(
       finalDepthPosition,
@@ -357,7 +349,7 @@ const downloadDXF = (content: string, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
-export const getDescriptionOffsets = (sondagem: PalitoData) => {
+export const getDescriptionClusters = (sondagem: PalitoData): Cluster[] => {
   const geolLayerData = sondagem.geology.map((entry, index) => {
     const str =
       sondagem.interp && sondagem.interp[index].trim()
@@ -367,9 +359,9 @@ export const getDescriptionOffsets = (sondagem: PalitoData) => {
         : entry.trim().toUpperCase();
     const lines = Math.ceil(str.length / 35);
     const estimatedHeight = lines * 0.45 - 0.1;
-    const from = sondagem.depths[index] | 0;
+    const from = sondagem.depths[index] || 0;
     const to =
-      sondagem.depths[index + 1] | sondagem.depths[sondagem.depths.length];
+      sondagem.depths[index + 1] || sondagem.depths[sondagem.depths.length];
     const layerThickness = to - from;
 
     return {
@@ -398,32 +390,212 @@ export const getDescriptionOffsets = (sondagem: PalitoData) => {
     });
   }
 
-  // let adjustedLayerHeights = [];
-  // let removedHeight = 0;
+  const conflicts = conflictAnalysis.filter((c) => c.hasOverflow);
 
-  // for (let i = 0; i < layerThicknessArr.length; i++) {
-  //   if (textHeightsArr[i] + removedHeight > layerThicknessArr[i]) {
-  //     const overflowDirection =
-  //       i === 0
-  //         ? "below"
-  //         : i === layerThicknessArr.length
-  //         ? "above"
-  //         : layerThicknessArr[i - 1] > layerThicknessArr[i + 1]
-  //         ? "above"
-  //         : "below";
-  //     const adjustedHeight = textHeightsArr[i] + 0.2;
+  // Criar clusters de camadas com texto "sobreposto"
+  let clusters: Cluster[] = [];
+  let processedIndexes = new Set();
 
-  //     if (overflowDirection === "above") {
-  //       adjustedLayerHeights[i - 1] - adjustedHeight;
-  //       adjustedLayerHeights.push(adjustedHeight);
-  //     } else {
-  //       removedHeight += adjustedHeight - layerThicknessArr[i];
-  //       adjustedLayerHeights.push(adjustedHeight);
-  //     }
-  //     // Preciso de alguma forma inserir um loop para ir "comendo" camadas até a soma de todas as alturas de textos ser menor que a soma de todas as alturas de camadas
-  //   } else {
-  //     adjustedLayerHeights.push(layerThicknessArr[i] - removedHeight);
-  //     removedHeight = 0;
-  //   }
-  // }
+  conflicts.forEach((conflict) => {
+    // Se conflito já tiver sido abordado em uma iteração anterior, ignorar
+    if (processedIndexes.has(conflict.index)) return;
+
+    // Iniciar cluster com a camada problemática
+    let cluster: Cluster = {
+      startIndex: conflict.index,
+      endIndex: conflict.index,
+      layers: [conflict.index],
+      totalNeeded: conflict.overflow,
+      totalAvailable: 0,
+      needsExtraSpace: 0,
+      unchanged: false,
+      layerSizes: [],
+    };
+
+    // Expandir para cima e para baixo até ter espaço suficiente
+    while (
+      cluster.totalAvailable < cluster.totalNeeded &&
+      ((cluster.startIndex > 0 && !processedIndexes.has(cluster.startIndex)) || // Coloquei aqui para não "comer" outro cluster
+        cluster.endIndex < conflictAnalysis.length - 1)
+    ) {
+      // Avaliar direção da expansão
+      const goBelow =
+        cluster.startIndex === 0
+          ? true
+          : cluster.endIndex === conflictAnalysis.length
+          ? false
+          : conflictAnalysis[cluster.startIndex - 1].availableSpace <
+            conflictAnalysis[cluster.endIndex + 1].availableSpace;
+
+      // Expandindo para cima
+      if (!goBelow) {
+        cluster.startIndex--;
+        cluster.layers.unshift(cluster.startIndex);
+        cluster.totalAvailable += Math.max(
+          0,
+          conflictAnalysis[cluster.startIndex].availableSpace
+        );
+        processedIndexes.add(cluster.startIndex);
+      }
+
+      // Expandindo para baixo
+      if (goBelow && cluster.endIndex < conflictAnalysis.length) {
+        cluster.endIndex++;
+        cluster.layers.push(cluster.endIndex);
+        cluster.totalAvailable += Math.max(
+          0,
+          conflictAnalysis[cluster.endIndex].availableSpace
+        );
+        processedIndexes.add(cluster.endIndex);
+      }
+    }
+
+    // Se ainda não tem espaço suficiente, usar espaço abaixo da profundidade final
+    if (cluster.totalAvailable < cluster.totalNeeded) {
+      cluster.needsExtraSpace = cluster.totalNeeded - cluster.totalAvailable;
+    }
+
+    // Aqui, com a cluster pronta, definir a espessura de cada camada
+    const totalOriginalSpace = cluster.layers.reduce(
+      (sum, layerIndex) => sum + layerThicknessArr[layerIndex],
+      0
+    );
+
+    const totalTextNeeded = cluster.layers.reduce(
+      (sum, layerIndex) => sum + textHeightsArr[layerIndex],
+      0
+    );
+
+    // Espaço final da cluster (original + extra se necessário)
+    const finalTotalSpace = totalOriginalSpace + cluster.needsExtraSpace;
+
+    // Distribuir espaço proporcionalmente
+    cluster.layerSizes = cluster.layers.map((layerIndex) => {
+      const textHeight = textHeightsArr[layerIndex];
+      const proportion = textHeight / totalTextNeeded;
+      const finalHeight = finalTotalSpace * proportion;
+
+      return {
+        layerIndex,
+        originalHeight: layerThicknessArr[layerIndex],
+        textHeight: textHeightsArr[layerIndex],
+        finalHeight: Math.max(textHeight + 0.1, finalHeight),
+        from: geolLayerData[layerIndex].from,
+        to: geolLayerData[layerIndex].to,
+      };
+    });
+    processedIndexes.add(conflict.index);
+    clusters.push(cluster);
+  });
+
+  // Adicionar camadas sem conflito como clusters individuais
+  for (let i = 0; i < conflictAnalysis.length; i++) {
+    if (!processedIndexes.has(i)) {
+      // Camada sem conflito = cluster de 1 camada
+      const singleLayerCluster: Cluster = {
+        startIndex: i,
+        endIndex: i,
+        layers: [i],
+        totalNeeded: 0,
+        totalAvailable: conflictAnalysis[i].availableSpace,
+        needsExtraSpace: 0,
+        layerSizes: [
+          {
+            layerIndex: i,
+            originalHeight: layerThicknessArr[i],
+            textHeight: textHeightsArr[i],
+            finalHeight: layerThicknessArr[i],
+            from: geolLayerData[i].from,
+            to: geolLayerData[i].to,
+          },
+        ],
+        unchanged: true,
+      };
+
+      clusters.push(singleLayerCluster);
+    }
+  }
+
+  // Ordenar clusters pela camada inicial (startIndex)
+  clusters.sort((a, b) => a.startIndex - b.startIndex);
+
+  return clusters;
+};
+
+const drawLayerData = (
+  dxf: DxfWriter,
+  layerSize: LayerSize,
+  currentOrigin: vec3_t,
+  depth: number,
+  text: string,
+  textOptions: MTextOptions,
+  lineLayer: DxfLayer,
+  textStyle: DxfStyle,
+  layerCenterY: number,
+  correctedDepth?: number
+) => {
+  // Parâmetros
+  const maxX = 2.72;
+  const breakX = 1.35;
+  const straightenX = 1.45;
+  if (!correctedDepth) correctedDepth = 0;
+
+  // Desenhando a linha de profundidade
+  const depthVertices = correctedDepth
+    ? [
+        { point: point2d(currentOrigin.x, currentOrigin.y - depth) },
+        { point: point2d(currentOrigin.x - breakX, currentOrigin.y - depth) },
+        {
+          point: point2d(
+            currentOrigin.x - straightenX,
+            currentOrigin.y - correctedDepth
+          ),
+        },
+        {
+          point: point2d(
+            currentOrigin.x - maxX,
+            currentOrigin.y - correctedDepth
+          ),
+        },
+      ]
+    : [
+        {
+          point: point2d(currentOrigin.x, currentOrigin.y - depth),
+        },
+        {
+          point: point2d(currentOrigin.x - maxX, currentOrigin.y - depth),
+        },
+      ];
+
+  dxf.addLWPolyline(depthVertices, { layerName: lineLayer.name });
+
+  // Inserindo texto de profundidade
+  const depthText = dxf.addText(
+    point3d(currentOrigin.x - 0.15, currentOrigin.y - depth - 0.07),
+    0.35,
+    depth.toFixed(2).replace(".", ","),
+    {
+      layerName: lineLayer.name,
+      horizontalAlignment: TextHorizontalAlignment.Right,
+      verticalAlignment: TextVerticalAlignment.Bottom,
+      secondAlignmentPoint: point3d(
+        currentOrigin.x - 0.15,
+        currentOrigin.y - depth - 0.07
+      ),
+    }
+  );
+  depthText.textStyle = textStyle.name;
+
+  // Descrições das camadas
+  const descriptionInsertionPoint = point3d(
+    currentOrigin.x - 1.55,
+    currentOrigin.y - layerCenterY + layerSize.textHeight / 2
+  );
+  const descriptionText = dxf.addMText(
+    descriptionInsertionPoint,
+    0.25,
+    text,
+    textOptions
+  );
+  descriptionText.textStyle = textStyle.name;
 };
