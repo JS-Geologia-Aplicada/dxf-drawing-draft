@@ -374,6 +374,10 @@ export const getDescriptionClusters = (sondagem: PalitoData): Cluster[] => {
     };
   });
 
+  if (geolLayerData.length >= sondagem.depths.length) {
+    geolLayerData.splice(sondagem.depths.length - 1);
+  }
+
   const layerThicknessArr = geolLayerData.map((entry) => entry.layerThickness);
   const textHeightsArr = geolLayerData.map((entry) => entry.estimatedHeight);
 
